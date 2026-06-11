@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: com.coderman.business.service.OutStockBatchAllocationTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.137 s - in com.coderman.business.service.OutStockBatchAllocationTest

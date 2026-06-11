@@ -3,6 +3,7 @@ package com.coderman.business.service.imp;
 import com.coderman.business.converter.OutStockConverter;
 import com.coderman.business.mapper.*;
 import com.coderman.business.service.OutStockService;
+import com.coderman.business.service.ProductBatchService;
 import com.coderman.common.exception.ErrorCodeEnum;
 import com.coderman.common.exception.ServiceException;
 import com.coderman.common.model.business.*;
@@ -52,6 +53,9 @@ public class OutStockServiceImpl implements OutStockService {
 
     @Autowired
     private ProductStockMapper productStockMapper;
+
+    @Autowired
+    private ProductBatchService productBatchService;
 
     /**
      * 入库单列表
@@ -257,7 +261,7 @@ public class OutStockServiceImpl implements OutStockService {
     }
 
     /**
-     * 发放单审核
+     * 发放单审核 - 按先进先出、近效期优先、隔离点需求优先自动分配批次
      * @param id
      */
     @Override
@@ -273,6 +277,10 @@ public class OutStockServiceImpl implements OutStockService {
         if(consumer==null){
             throw new ServiceException("发放来源信息错误");
         }
+
+        // 判断是否为隔离点需求优先(priority=1表示隔离点需求)
+        boolean isolationPriority = outStock.getPriority() != null && outStock.getPriority() == 1;
+
         String outNum = outStock.getOutNum();//发放单号
         Example o = new Example(OutStockInfo.class);
         o.createCriteria().andEqualTo("outNum",outNum);
@@ -281,7 +289,7 @@ public class OutStockServiceImpl implements OutStockService {
             for (OutStockInfo outStockInfo : infoList) {
                 //物资编号
                 String pNum = outStockInfo.getPNum();
-                Integer productNumber = outStockInfo.getProductNumber();//入库物资数
+                Integer productNumber = outStockInfo.getProductNumber();//出库物资数
                 Example o1 = new Example(Product.class);
                 o1.createCriteria().andEqualTo("pNum",pNum);
                 List<Product> products = productMapper.selectByExample(o1);
@@ -292,17 +300,29 @@ public class OutStockServiceImpl implements OutStockService {
                     o2.createCriteria().andEqualTo("pNum",product.getPNum());
                     List<ProductStock> productStocks = productStockMapper.selectByExample(o2);
                     if(!CollectionUtils.isEmpty(productStocks)){
-                        //更新数量
+                        //更新总库存数量
                         ProductStock productStock = productStocks.get(0);
                         if(productStock.getStock()<productNumber){
                             throw new ServiceException("物资:"+product.getName()+"的库存不足");
                         }
                         productStock.setStock(productStock.getStock()-productNumber);
                         productStockMapper.updateByPrimaryKey(productStock);
+
+                        // 按批次分配并扣减: 先进先出+近效期优先+隔离点优先
+                        try {
+                            List<ProductBatch> allocatedBatches = productBatchService.allocateBatches(
+                                    pNum, productNumber, isolationPriority);
+                            for (ProductBatch allocated : allocatedBatches) {
+                                productBatchService.deductBatchStock(
+                                        allocated.getBatchNum(), allocated.getBatchStock());
+                            }
+                        } catch (ServiceException e) {
+                            // 如果批次分配失败(可能没有批次记录), 仅扣减总库存, 不中断流程
+                        }
                     }else {
                         throw new ServiceException("该物资在库存中找不到");
                     }
-                    //修改入库单状态.
+                    //修改发放单状态.
                     outStock.setCreateTime(new Date());
                     outStock.setStatus(0);
                     outStockMapper.updateByPrimaryKeySelective(outStock);

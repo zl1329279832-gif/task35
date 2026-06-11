@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.coderman.business.mapper.ProductBatchMapper">
+
+    <!--按先进先出+近效期优先查询可用批次: 先按有效期升序(近效期优先), 再按创建时间升序(先进先出)-->
+    <select id="findAvailableBatchesFIFO" parameterType="string"
+            resultType="com.coderman.common.model.business.ProductBatch">
+        SELECT id, p_num, batch_num, supplier_id, production_date, expiry_date,
+               inspection_status, reserve_level, batch_stock, locked_stock, in_num,
+               create_time, modified_time, remark
+        FROM biz_product_batch
+        WHERE p_num = #{pNum}
+          AND inspection_status = 1
+          AND batch_stock - locked_stock > 0
+          AND expiry_date >= CURDATE()
+        ORDER BY expiry_date ASC, create_time ASC
+    </select>
+
+    <!--查询近效期批次-->
+    <select id="findNearExpiryBatches" parameterType="int"
+            resultType="com.coderman.common.vo.business.ProductBatchVO">
+        SELECT b.id, b.p_num, b.batch_num, b.supplier_id, b.production_date, b.expiry_date,
+               b.inspection_status, b.reserve_level, b.batch_stock, b.locked_stock,
+               (b.batch_stock - b.locked_stock) AS available_stock,
+               b.in_num, b.create_time, b.remark,
+               DATEDIFF(b.expiry_date, CURDATE()) AS remaining_days,
+               p.name AS product_name,
+               s.name AS supplier_name
+        FROM biz_product_batch b
+        LEFT JOIN biz_product p ON b.p_num = p.p_num
+        LEFT JOIN biz_supplier s ON b.supplier_id = s.id
+        WHERE b.inspection_status = 1
+          AND b.batch_stock > 0
+          AND DATEDIFF(b.expiry_date, CURDATE()) BETWEEN 0 AND #{days}
+        ORDER BY b.expiry_date ASC
+    </select>
+
+    <!--批次追溯查询-->
+    <select id="traceBatch" parameterType="string"
+            resultType="com.coderman.common.vo.business.TraceVO">
+        SELECT b.batch_num, b.p_num, p.name AS product_name,
+               s.name AS supplier_name, b.production_date, b.expiry_date,
+               b.inspection_status, b.reserve_level, b.batch_stock,
+               b.in_num, i.create_time AS in_stock_time, i.operator AS in_stock_operator
+        FROM biz_product_batch b
+        LEFT JOIN biz_product p ON b.p_num = p.p_num
+        LEFT JOIN biz_supplier s ON b.supplier_id = s.id
+        LEFT JOIN biz_in_stock i ON b.in_num = i.in_num
+        WHERE b.batch_num = #{batchNum}
+        LIMIT 1
+    </select>
+
+    <!--查询物资的所有批次-->
+    <select id="findBatchList"
+            resultType="com.coderman.common.vo.business.ProductBatchVO">
+        SELECT b.id, b.p_num, b.batch_num, b.supplier_id, b.production_date, b.expiry_date,
+               b.inspection_status, b.reserve_level, b.batch_stock, b.locked_stock,
+               (b.batch_stock - b.locked_stock) AS available_stock,
+               b.in_num, b.create_time, b.remark,
+               DATEDIFF(b.expiry_date, CURDATE()) AS remaining_days,
+               p.name AS product_name,
+               s.name AS supplier_name
+        FROM biz_product_batch b
+        LEFT JOIN biz_product p ON b.p_num = p.p_num
+        LEFT JOIN biz_supplier s ON b.supplier_id = s.id
+        WHERE 1=1
+        <if test="pNum != null and pNum != ''">
+            AND b.p_num = #{pNum}
+        </if>
+        <if test="batchNum != null and batchNum != ''">
+            AND b.batch_num LIKE concat('%', #{batchNum}, '%')
+        </if>
+        ORDER BY b.create_time DESC
+    </select>
+
+</mapper>

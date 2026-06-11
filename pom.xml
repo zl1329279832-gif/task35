@@ -27,6 +27,7 @@
 
     <properties>
         <java.version>1.8</java.version>
+        <lombok.version>1.18.30</lombok.version>
         <fastjson.version>1.2.68</fastjson.version>
         <ExcelKit.version>2.0.72</ExcelKit.version>
         <xml-apis.version>1.4.01</xml-apis.version>

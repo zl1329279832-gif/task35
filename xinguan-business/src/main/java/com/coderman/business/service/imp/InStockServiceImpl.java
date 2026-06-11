@@ -3,6 +3,7 @@ package com.coderman.business.service.imp;
 import com.coderman.business.converter.InStockConverter;
 import com.coderman.business.mapper.*;
 import com.coderman.business.service.InStockService;
+import com.coderman.business.service.ProductBatchService;
 import com.coderman.common.exception.ErrorCodeEnum;
 import com.coderman.common.exception.ServiceException;
 import com.coderman.common.model.business.*;
@@ -22,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import tk.mybatis.mapper.entity.Example;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -53,6 +56,12 @@ public class InStockServiceImpl implements InStockService {
 
     @Autowired
     private SupplierMapper supplierMapper;
+
+    @Autowired
+    private ProductBatchService productBatchService;
+
+    @Autowired
+    private ProductBatchMapper productBatchMapper;
 
     /**
      * 入库单
@@ -160,7 +169,7 @@ public class InStockServiceImpl implements InStockService {
     }
 
     /**
-     * 物资入库
+     * 物资入库 - 增加批次信息记录
      * @param inStockVO
      */
     @Transactional
@@ -197,6 +206,51 @@ public class InStockServiceImpl implements InStockService {
                     inStockInfo.setPNum(dbProduct.getPNum());
                     inStockInfo.setInNum(IN_STOCK_NUM);
                     inStockInfoMapper.insert(inStockInfo);
+
+                    // 记录批次信息
+                    String batchNum = item.get("batchNum") != null ? (String) item.get("batchNum") : null;
+                    if (batchNum != null && !batchNum.isEmpty()) {
+                        ProductBatch batch = new ProductBatch();
+                        batch.setPNum(dbProduct.getPNum());
+                        batch.setBatchNum(batchNum);
+                        batch.setSupplierId(inStockVO.getSupplierId());
+                        batch.setInNum(IN_STOCK_NUM);
+                        batch.setBatchStock((long) productNumber);
+                        batch.setLockedStock(0L);
+
+                        // 解析生产日期
+                        if (item.get("productionDate") != null) {
+                            try {
+                                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                                batch.setProductionDate(sdf.parse((String) item.get("productionDate")));
+                            } catch (ParseException e) {
+                                // 忽略解析异常, 使用null
+                            }
+                        }
+                        // 解析有效期
+                        if (item.get("expiryDate") != null) {
+                            try {
+                                SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
+                                batch.setExpiryDate(sdf.parse((String) item.get("expiryDate")));
+                            } catch (ParseException e) {
+                                // 忽略解析异常, 使用null
+                            }
+                        }
+                        // 质检状态
+                        if (item.get("inspectionStatus") != null) {
+                            batch.setInspectionStatus((Integer) item.get("inspectionStatus"));
+                        } else {
+                            batch.setInspectionStatus(0); // 默认待检
+                        }
+                        // 储备等级
+                        if (item.get("reserveLevel") != null) {
+                            batch.setReserveLevel((Integer) item.get("reserveLevel"));
+                        } else {
+                            batch.setReserveLevel(1); // 默认普通
+                        }
+
+                        productBatchService.addBatch(batch);
+                    }
                 }
             }
 
