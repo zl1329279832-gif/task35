@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.coderman.business.mapper.TransferRequestInfoMapper">
+
+    <resultMap id="BaseResultMap" type="com.coderman.common.model.business.TransferRequestInfo">
+        <id column="id" property="id"/>
+        <result column="transfer_num" property="transferNum"/>
+        <result column="batch_number" property="batchNumber"/>
+        <result column="allocated_quantity" property="allocatedQuantity"/>
+        <result column="confirmed_quantity" property="confirmedQuantity"/>
+    </resultMap>
+
+    <select id="findByTransferNum" resultMap="BaseResultMap">
+        SELECT * FROM biz_transfer_request_info WHERE transfer_num = #{transferNum}
+    </select>
+
+</mapper>

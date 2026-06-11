@@ -3,6 +3,7 @@ package com.coderman.business.service.imp;
 import com.coderman.business.converter.InStockConverter;
 import com.coderman.business.mapper.*;
 import com.coderman.business.service.InStockService;
+import com.coderman.business.service.ProductBatchService;
 import com.coderman.common.exception.ErrorCodeEnum;
 import com.coderman.common.exception.ServiceException;
 import com.coderman.common.model.business.*;
@@ -53,6 +54,9 @@ public class InStockServiceImpl implements InStockService {
 
     @Autowired
     private SupplierMapper supplierMapper;
+
+    @Autowired
+    private ProductBatchService productBatchService;
 
     /**
      * 入库单
@@ -300,8 +304,35 @@ public class InStockServiceImpl implements InStockService {
                         ProductStock productStock = new ProductStock();
                         productStock.setPNum(product.getPNum());
                         productStock.setStock((long) productNumber);
+                        productStock.setVersion(0);
                         productStockMapper.insert(productStock);
                     }
+
+                    // 创建批次记录
+                    ProductBatch batch = new ProductBatch();
+                    batch.setBatchNumber(
+                            inStockInfo.getBatchNumber() != null && !"".equals(inStockInfo.getBatchNumber())
+                                    ? inStockInfo.getBatchNumber()
+                                    : "BATCH-" + System.currentTimeMillis() + "-" + inStockInfo.getPNum()
+                    );
+                    batch.setPNum(inStockInfo.getPNum());
+                    batch.setInNum(inStock.getInNum());
+                    batch.setSupplierId(inStock.getSupplierId());
+                    batch.setProductionDate(inStockInfo.getProductionDate());
+                    batch.setExpiryDate(inStockInfo.getExpiryDate());
+                    batch.setQualityStatus(
+                            inStockInfo.getQualityStatus() != null ? inStockInfo.getQualityStatus() : 0
+                    );
+                    batch.setReserveLevel(
+                            inStockInfo.getReserveLevel() != null ? inStockInfo.getReserveLevel() : 1
+                    );
+                    batch.setQuantity((long) productNumber);
+                    batch.setLockedQuantity(0L);
+                    batch.setStatus(0);
+                    batch.setCreateTime(new Date());
+                    batch.setModifiedTime(new Date());
+                    productBatchService.createBatch(batch);
+
                     //修改入库单状态.
                     inStock.setCreateTime(new Date());
                     inStock.setStatus(0);

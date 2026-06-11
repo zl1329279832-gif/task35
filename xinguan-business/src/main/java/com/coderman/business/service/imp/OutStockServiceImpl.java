@@ -3,11 +3,14 @@ package com.coderman.business.service.imp;
 import com.coderman.business.converter.OutStockConverter;
 import com.coderman.business.mapper.*;
 import com.coderman.business.service.OutStockService;
+import com.coderman.business.service.ProductBatchService;
 import com.coderman.common.exception.ErrorCodeEnum;
 import com.coderman.common.exception.ServiceException;
 import com.coderman.common.model.business.*;
 import com.coderman.common.response.ActiveUser;
 import com.coderman.common.vo.business.ConsumerVO;
+import com.coderman.common.vo.business.BatchAllocationItemVO;
+import com.coderman.common.vo.business.BatchAllocationResultVO;
 import com.coderman.common.vo.business.OutStockDetailVO;
 import com.coderman.common.vo.business.OutStockItemVO;
 import com.coderman.common.vo.business.OutStockVO;
@@ -22,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 import tk.mybatis.mapper.entity.Example;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -52,6 +56,12 @@ public class OutStockServiceImpl implements OutStockService {
 
     @Autowired
     private ProductStockMapper productStockMapper;
+
+    @Autowired
+    private ProductBatchMapper productBatchMapper;
+
+    @Autowired
+    private ProductBatchService productBatchService;
 
     /**
      * 入库单列表
@@ -310,6 +320,33 @@ public class OutStockServiceImpl implements OutStockService {
                     throw new ServiceException("物资编号为:["+pNum+"]的物资不存在");
                 }
             }
+
+            // 批次分配与扣减
+            for (OutStockInfo outStockInfo2 : infoList) {
+                String batchPNum = outStockInfo2.getPNum();
+                Integer batchProductNumber = outStockInfo2.getProductNumber();
+
+                BatchAllocationResultVO allocation = productBatchService.allocateBatches(
+                        batchPNum, (long) batchProductNumber, outStock.getConsumerId(), "NEAR_EXPIRY");
+
+                if (!allocation.isFullyAllocated()) {
+                    throw new ServiceException(ErrorCodeEnum.BATCH_ALLOCATION_FAILED);
+                }
+
+                List<ProductBatchService.BatchLockItem> lockItems = new ArrayList<>();
+                for (BatchAllocationItemVO allocItem : allocation.getItems()) {
+                    Example batchExample = new Example(ProductBatch.class);
+                    batchExample.createCriteria().andEqualTo("batchNumber", allocItem.getBatchNumber());
+                    List<ProductBatch> batches = productBatchMapper.selectByExample(batchExample);
+                    if (!CollectionUtils.isEmpty(batches)) {
+                        lockItems.add(new ProductBatchService.BatchLockItem(
+                                batches.get(0).getId(), allocItem.getAllocatedQuantity()));
+                    }
+                }
+                productBatchService.lockBatches(lockItems);
+                productBatchService.confirmBatchDeductions(lockItems);
+            }
+
         }else {
             throw new ServiceException("发放的明细不能为空");
         }

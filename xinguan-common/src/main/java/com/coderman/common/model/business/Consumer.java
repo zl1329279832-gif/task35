@@ -2,6 +2,7 @@ package com.coderman.common.model.business;
 
 import lombok.Data;
 
+import javax.persistence.Column;
 import javax.persistence.GeneratedValue;
 import javax.persistence.Id;
 import javax.persistence.Table;
@@ -28,4 +29,7 @@ public class Consumer {
     private  Integer sort;
 
     private String contact;
+
+    @Column(name = "is_isolation_point")
+    private Integer isIsolationPoint;
 }

@@ -32,7 +32,19 @@ public enum  ErrorCodeEnum implements BaseCodeInterface {
     PRODUCT_OUT_STOCK_NUMBER_ERROR(30008,"物资发放数量非法"),
     PRODUCT_IN_STOCK_EMPTY(30006,"物资入库不能为空"),
     PRODUCT_OUT_STOCK_EMPTY(30007,"物资发放不能为空"),
-    PRODUCT_STOCK_ERROR(30009,"物资库存不足");
+    PRODUCT_STOCK_ERROR(30009,"物资库存不足"),
+
+    //批次相关
+    BATCH_NOT_FOUND(30010,"批次不存在"),
+    BATCH_STOCK_INSUFFICIENT(30011,"批次可用库存不足"),
+    BATCH_LOCK_FAILED(30012,"批次库存锁定失败"),
+    BATCH_ALLOCATION_FAILED(30013,"批次分配失败"),
+
+    //调拨相关
+    TRANSFER_NOT_FOUND(30020,"调拨申请不存在"),
+    TRANSFER_STATUS_ERROR(30021,"调拨状态错误"),
+    TRANSFER_STOCK_CONFLICT(30022,"库存更新冲突,请重试"),
+    TRANSFER_INSUFFICIENT_STOCK(30023,"库存不足,无法调拨");
     /** 错误码 */
     private int resultCode;
 

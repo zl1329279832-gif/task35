@@ -18,4 +18,6 @@ public class ProductStock {
 
     private Long stock;
 
+    private Integer version;
+
 }

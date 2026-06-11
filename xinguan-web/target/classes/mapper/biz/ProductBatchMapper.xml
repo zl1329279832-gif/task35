@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.coderman.business.mapper.ProductBatchMapper">
+
+    <resultMap id="BaseResultMap" type="com.coderman.common.model.business.ProductBatch">
+        <id column="id" property="id"/>
+        <result column="batch_number" property="batchNumber"/>
+        <result column="p_num" property="pNum"/>
+        <result column="in_num" property="inNum"/>
+        <result column="supplier_id" property="supplierId"/>
+        <result column="production_date" property="productionDate"/>
+        <result column="expiry_date" property="expiryDate"/>
+        <result column="quality_status" property="qualityStatus"/>
+        <result column="reserve_level" property="reserveLevel"/>
+        <result column="quantity" property="quantity"/>
+        <result column="locked_quantity" property="lockedQuantity"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="modified_time" property="modifiedTime"/>
+    </resultMap>
+
+    <select id="findAvailableBatches" resultMap="BaseResultMap">
+        SELECT *
+        FROM biz_product_batch
+        WHERE p_num = #{pNum}
+          AND quality_status IN (0, 1)
+          AND status = 0
+          AND (quantity - locked_quantity) &gt; 0
+        ORDER BY ${orderByClause}
+    </select>
+
+    <select id="findAvailableBatchesForIsolationPoint" resultMap="BaseResultMap">
+        SELECT *
+        FROM biz_product_batch
+        WHERE p_num = #{pNum}
+          AND quality_status IN (0, 1)
+          AND status = 0
+          AND (quantity - locked_quantity) &gt; 0
+        ORDER BY reserve_level DESC, expiry_date ASC
+    </select>
+
+    <update id="lockBatchQuantity">
+        UPDATE biz_product_batch
+        SET locked_quantity = locked_quantity + #{lockAmount},
+            modified_time = NOW()
+        WHERE id = #{id}
+          AND status = 0
+          AND (quantity - locked_quantity) &gt;= #{lockAmount}
+    </update>
+
+    <update id="unlockBatchQuantity">
+        UPDATE biz_product_batch
+        SET locked_quantity = locked_quantity - #{unlockAmount},
+            modified_time = NOW()
+        WHERE id = #{id}
+          AND locked_quantity &gt;= #{unlockAmount}
+    </update>
+
+    <update id="confirmBatchDeduction">
+        UPDATE biz_product_batch
+        SET quantity = quantity - #{deductAmount},
+            locked_quantity = locked_quantity - #{deductAmount},
+            modified_time = NOW()
+        WHERE id = #{id}
+          AND quantity &gt;= #{deductAmount}
+          AND locked_quantity &gt;= #{deductAmount}
+    </update>
+
+    <select id="findTraceByBatchNumber" resultMap="BaseResultMap">
+        SELECT * FROM biz_product_batch WHERE batch_number = #{batchNumber}
+    </select>
+
+    <select id="findNearExpiryBatches" resultMap="BaseResultMap">
+        SELECT *
+        FROM biz_product_batch
+        WHERE status = 0
+          AND quality_status IN (0, 1)
+          AND expiry_date IS NOT NULL
+          AND expiry_date &lt;= DATE_ADD(NOW(), INTERVAL #{days} DAY)
+        ORDER BY expiry_date ASC
+    </select>
+
+</mapper>
