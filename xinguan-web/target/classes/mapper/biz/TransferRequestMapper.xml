@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.coderman.business.mapper.TransferRequestMapper">
+
+    <!--悲观锁查询调拨单(行锁)-->
+    <select id="findByIdForUpdate"
+            resultType="com.coderman.common.model.business.TransferRequest">
+        SELECT * FROM biz_transfer_request WHERE id = #{id} FOR UPDATE
+    </select>
+
+</mapper>

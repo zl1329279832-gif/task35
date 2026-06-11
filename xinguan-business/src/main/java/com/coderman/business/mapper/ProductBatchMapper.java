@@ -54,4 +54,9 @@ public interface ProductBatchMapper extends Mapper<ProductBatch> {
      * 查询近效期批次
      */
     List<ProductBatch> findNearExpiryBatches(@Param("days") int days);
+
+    /**
+     * 原子恢复批次数量（回滚已扣减的批次）
+     */
+    int restoreBatchQuantity(@Param("id") Long id, @Param("restoreAmount") Long restoreAmount);
 }

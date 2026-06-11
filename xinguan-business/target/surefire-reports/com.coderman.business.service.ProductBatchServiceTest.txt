@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
 Test set: com.coderman.business.service.ProductBatchServiceTest
 -------------------------------------------------------------------------------
-Tests run: 11, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.369 s - in com.coderman.business.service.ProductBatchServiceTest
+Tests run: 18, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 2.075 s - in com.coderman.business.service.ProductBatchServiceTest

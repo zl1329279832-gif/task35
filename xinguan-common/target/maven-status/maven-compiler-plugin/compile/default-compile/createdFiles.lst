@@ -37,7 +37,9 @@ com\coderman\common\model\system\UserRole.class
 com\coderman\common\vo\system\RoleTransferItemVO.class
 com\coderman\common\vo\system\PageVO.class
 com\coderman\common\generator\GeneratorCoder.class
+com\coderman\common\model\business\ProductBatchTrace.class
 com\coderman\common\exception\BaseCodeInterface.class
+com\coderman\common\vo\business\ProductBatchTraceVO.class
 com\coderman\common\enums\buisiness\BizUserTypeEnum.class
 com\coderman\common\vo\business\BatchAllocationItemVO.class
 com\coderman\common\vo\system\MenuNodeVO.class

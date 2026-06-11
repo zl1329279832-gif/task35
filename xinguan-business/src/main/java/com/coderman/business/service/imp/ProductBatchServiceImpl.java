@@ -2,6 +2,7 @@ package com.coderman.business.service.imp;
 
 import com.coderman.business.mapper.ConsumerMapper;
 import com.coderman.business.mapper.ProductBatchMapper;
+import com.coderman.business.mapper.ProductBatchTraceMapper;
 import com.coderman.business.mapper.ProductMapper;
 import com.coderman.business.mapper.SupplierMapper;
 import com.coderman.business.service.ProductBatchService;
@@ -10,9 +11,11 @@ import com.coderman.common.exception.ServiceException;
 import com.coderman.common.model.business.Consumer;
 import com.coderman.common.model.business.Product;
 import com.coderman.common.model.business.ProductBatch;
+import com.coderman.common.model.business.ProductBatchTrace;
 import com.coderman.common.model.business.Supplier;
 import com.coderman.common.vo.business.BatchAllocationItemVO;
 import com.coderman.common.vo.business.BatchAllocationResultVO;
+import com.coderman.common.vo.business.ProductBatchTraceVO;
 import com.coderman.common.vo.business.ProductBatchVO;
 import com.coderman.common.vo.system.PageVO;
 import com.github.pagehelper.PageHelper;
@@ -39,6 +42,9 @@ public class ProductBatchServiceImpl implements ProductBatchService {
     private ProductBatchMapper productBatchMapper;
 
     @Autowired
+    private ProductBatchTraceMapper productBatchTraceMapper;
+
+    @Autowired
     private ProductMapper productMapper;
 
     @Autowired
@@ -56,6 +62,11 @@ public class ProductBatchServiceImpl implements ProductBatchService {
             batch.setModifiedTime(new Date());
         }
         productBatchMapper.insertSelective(batch);
+
+        // 记录入库追溯事件
+        recordTraceEvent(batch.getBatchNumber(), batch.getPNum(), "IN",
+                batch.getQuantity(), batch.getInNum(), "批次入库");
+
         return batch;
     }
 
@@ -103,6 +114,20 @@ public class ProductBatchServiceImpl implements ProductBatchService {
     }
 
     @Override
+    public List<ProductBatchTraceVO> getFullTraceability(String batchNumber) {
+        List<ProductBatchTrace> traces = productBatchTraceMapper.findByBatchNumber(batchNumber);
+        List<ProductBatchTraceVO> voList = new ArrayList<>();
+        if (!CollectionUtils.isEmpty(traces)) {
+            for (ProductBatchTrace trace : traces) {
+                ProductBatchTraceVO vo = new ProductBatchTraceVO();
+                BeanUtils.copyProperties(trace, vo);
+                voList.add(vo);
+            }
+        }
+        return voList;
+    }
+
+    @Override
     public void updateQualityStatus(Long id, Integer qualityStatus) {
         ProductBatch batch = productBatchMapper.selectByPrimaryKey(id);
         if (batch == null) {
@@ -111,6 +136,17 @@ public class ProductBatchServiceImpl implements ProductBatchService {
         batch.setQualityStatus(qualityStatus);
         batch.setModifiedTime(new Date());
         productBatchMapper.updateByPrimaryKeySelective(batch);
+
+        // 记录质检追溯事件
+        String statusText;
+        switch (qualityStatus) {
+            case 1: statusText = "质检通过"; break;
+            case 2: statusText = "质检不合格"; break;
+            case 3: statusText = "已过期"; break;
+            default: statusText = "待质检"; break;
+        }
+        recordTraceEvent(batch.getBatchNumber(), batch.getPNum(), "QC",
+                batch.getQuantity(), null, statusText);
     }
 
     @Override
@@ -194,6 +230,13 @@ public class ProductBatchServiceImpl implements ProductBatchService {
             if (rows == 0) {
                 throw new ServiceException(ErrorCodeEnum.BATCH_LOCK_FAILED);
             }
+
+            // 记录锁定追溯事件
+            ProductBatch batch = productBatchMapper.selectByPrimaryKey(item.getBatchId());
+            if (batch != null) {
+                recordTraceEvent(batch.getBatchNumber(), batch.getPNum(), "LOCK",
+                        item.getQuantity(), null, "批次库存锁定");
+            }
         }
     }
 
@@ -201,7 +244,17 @@ public class ProductBatchServiceImpl implements ProductBatchService {
     @Transactional(rollbackFor = Exception.class)
     public void unlockBatches(List<BatchLockItem> items) {
         for (BatchLockItem item : items) {
-            productBatchMapper.unlockBatchQuantity(item.getBatchId(), item.getQuantity());
+            int rows = productBatchMapper.unlockBatchQuantity(item.getBatchId(), item.getQuantity());
+            if (rows == 0) {
+                throw new ServiceException(ErrorCodeEnum.BATCH_LOCK_FAILED);
+            }
+
+            // 记录解锁追溯事件
+            ProductBatch batch = productBatchMapper.selectByPrimaryKey(item.getBatchId());
+            if (batch != null) {
+                recordTraceEvent(batch.getBatchNumber(), batch.getPNum(), "UNLOCK",
+                        item.getQuantity(), null, "批次库存解锁");
+            }
         }
     }
 
@@ -213,7 +266,57 @@ public class ProductBatchServiceImpl implements ProductBatchService {
             if (rows == 0) {
                 throw new ServiceException(ErrorCodeEnum.BATCH_STOCK_INSUFFICIENT);
             }
+
+            // 记录出库追溯事件
+            ProductBatch batch = productBatchMapper.selectByPrimaryKey(item.getBatchId());
+            if (batch != null) {
+                recordTraceEvent(batch.getBatchNumber(), batch.getPNum(), "OUT",
+                        item.getQuantity(), null, "批次库存扣减确认");
+            }
         }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void restoreBatchQuantities(List<BatchLockItem> items) {
+        for (BatchLockItem item : items) {
+            int rows = productBatchMapper.restoreBatchQuantity(item.getBatchId(), item.getQuantity());
+            if (rows == 0) {
+                throw new ServiceException(ErrorCodeEnum.BATCH_NOT_FOUND);
+            }
+
+            // 记录回滚追溯事件
+            ProductBatch batch = productBatchMapper.selectByPrimaryKey(item.getBatchId());
+            if (batch != null) {
+                recordTraceEvent(batch.getBatchNumber(), batch.getPNum(), "ROLLBACK",
+                        item.getQuantity(), null, "批次数量恢复");
+            }
+        }
+    }
+
+    @Override
+    public void recordTraceEvent(String batchNumber, String pNum, String eventType,
+                                 Long quantity, String refNum, String remark) {
+        ProductBatchTrace trace = new ProductBatchTrace();
+        trace.setBatchNumber(batchNumber);
+        trace.setPNum(pNum);
+        trace.setEventType(eventType);
+        trace.setQuantity(quantity);
+        trace.setRefNum(refNum);
+        trace.setRemark(remark);
+        trace.setCreateTime(new Date());
+
+        try {
+            com.coderman.common.response.ActiveUser activeUser =
+                    (com.coderman.common.response.ActiveUser) org.apache.shiro.SecurityUtils.getSubject().getPrincipal();
+            if (activeUser != null) {
+                trace.setOperator(activeUser.getUser().getUsername());
+            }
+        } catch (Exception e) {
+            // 非Web上下文（如测试环境），忽略
+        }
+
+        productBatchTraceMapper.insertSelective(trace);
     }
 
     /**

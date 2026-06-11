@@ -2,6 +2,7 @@ package com.coderman.business.service;
 
 import com.coderman.common.model.business.ProductBatch;
 import com.coderman.common.vo.business.BatchAllocationResultVO;
+import com.coderman.common.vo.business.ProductBatchTraceVO;
 import com.coderman.common.vo.business.ProductBatchVO;
 import com.coderman.common.vo.system.PageVO;
 
@@ -28,9 +29,14 @@ public interface ProductBatchService {
     PageVO<ProductBatchVO> findBatches(Integer pageNum, Integer pageSize, ProductBatchVO vo);
 
     /**
-     * 批次追溯查询
+     * 批次追溯查询（批次基本信息）
      */
     ProductBatchVO getTraceability(String batchNumber);
+
+    /**
+     * 全链路追溯查询（返回批次全部事件记录）
+     */
+    List<ProductBatchTraceVO> getFullTraceability(String batchNumber);
 
     /**
      * 更新质检状态
@@ -66,6 +72,17 @@ public interface ProductBatchService {
      * 确认批次扣减
      */
     void confirmBatchDeductions(List<BatchLockItem> items);
+
+    /**
+     * 原子恢复批次数量（回滚已扣减的批次）
+     */
+    void restoreBatchQuantities(List<BatchLockItem> items);
+
+    /**
+     * 记录追溯事件
+     */
+    void recordTraceEvent(String batchNumber, String pNum, String eventType,
+                          Long quantity, String refNum, String remark);
 
     /**
      * 批次锁定项

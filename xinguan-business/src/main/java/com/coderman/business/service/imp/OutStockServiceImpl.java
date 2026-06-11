@@ -271,12 +271,13 @@ public class OutStockServiceImpl implements OutStockService {
      * @param id
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void publish(Long id) {
         OutStock outStock = outStockMapper.selectByPrimaryKey(id);
-        Consumer consumer = consumerMapper.selectByPrimaryKey(outStock.getConsumerId());
         if(outStock==null){
             throw new ServiceException("发放单不存在");
         }
+        Consumer consumer = consumerMapper.selectByPrimaryKey(outStock.getConsumerId());
         if(outStock.getStatus()!=2){
             throw new ServiceException("发放单状态错误");
         }
@@ -288,40 +289,7 @@ public class OutStockServiceImpl implements OutStockService {
         o.createCriteria().andEqualTo("outNum",outNum);
         List<OutStockInfo> infoList = outStockInfoMapper.selectByExample(o);//发放详情
         if(!CollectionUtils.isEmpty(infoList)){
-            for (OutStockInfo outStockInfo : infoList) {
-                //物资编号
-                String pNum = outStockInfo.getPNum();
-                Integer productNumber = outStockInfo.getProductNumber();//入库物资数
-                Example o1 = new Example(Product.class);
-                o1.createCriteria().andEqualTo("pNum",pNum);
-                List<Product> products = productMapper.selectByExample(o1);
-                if(products.size()>0){
-                    Product product = products.get(0);
-                    //如果存在，就减少数量
-                    Example o2 = new Example(ProductStock.class);
-                    o2.createCriteria().andEqualTo("pNum",product.getPNum());
-                    List<ProductStock> productStocks = productStockMapper.selectByExample(o2);
-                    if(!CollectionUtils.isEmpty(productStocks)){
-                        //更新数量
-                        ProductStock productStock = productStocks.get(0);
-                        if(productStock.getStock()<productNumber){
-                            throw new ServiceException("物资:"+product.getName()+"的库存不足");
-                        }
-                        productStock.setStock(productStock.getStock()-productNumber);
-                        productStockMapper.updateByPrimaryKey(productStock);
-                    }else {
-                        throw new ServiceException("该物资在库存中找不到");
-                    }
-                    //修改入库单状态.
-                    outStock.setCreateTime(new Date());
-                    outStock.setStatus(0);
-                    outStockMapper.updateByPrimaryKeySelective(outStock);
-                }else {
-                    throw new ServiceException("物资编号为:["+pNum+"]的物资不存在");
-                }
-            }
-
-            // 批次分配与扣减
+            // 先进行批次分配与锁定（在库存扣减之前）
             for (OutStockInfo outStockInfo2 : infoList) {
                 String batchPNum = outStockInfo2.getPNum();
                 Integer batchProductNumber = outStockInfo2.getProductNumber();
@@ -343,10 +311,50 @@ public class OutStockServiceImpl implements OutStockService {
                                 batches.get(0).getId(), allocItem.getAllocatedQuantity()));
                     }
                 }
+                // 锁定并确认扣减（内部会记录 LOCK + OUT 追溯事件）
                 productBatchService.lockBatches(lockItems);
                 productBatchService.confirmBatchDeductions(lockItems);
+
+                // 记录出库追溯事件（发放维度）
+                for (BatchAllocationItemVO allocItem : allocation.getItems()) {
+                    productBatchService.recordTraceEvent(allocItem.getBatchNumber(), batchPNum,
+                            "OUT", allocItem.getAllocatedQuantity(), outNum,
+                            "物资发放出库");
+                }
             }
 
+            // 然后扣减库存（使用悲观锁 + 乐观锁）
+            for (OutStockInfo outStockInfo : infoList) {
+                String pNum = outStockInfo.getPNum();
+                Integer productNumber = outStockInfo.getProductNumber();
+                Example o1 = new Example(Product.class);
+                o1.createCriteria().andEqualTo("pNum",pNum);
+                List<Product> products = productMapper.selectByExample(o1);
+                if(products.size()>0){
+                    Product product = products.get(0);
+                    // 悲观锁查询库存 + 乐观锁更新
+                    ProductStock productStock = productStockMapper.findByPNumForUpdate(product.getPNum());
+                    if(productStock == null){
+                        throw new ServiceException("该物资在库存中找不到");
+                    }
+                    if(productStock.getStock() < productNumber){
+                        throw new ServiceException("物资:"+product.getName()+"的库存不足");
+                    }
+                    long newStock = productStock.getStock() - productNumber;
+                    int rows = productStockMapper.updateStockWithVersion(
+                            product.getPNum(), newStock, productStock.getVersion());
+                    if (rows == 0) {
+                        throw new ServiceException("库存更新冲突，请重试");
+                    }
+                }else {
+                    throw new ServiceException("物资编号为:["+pNum+"]的物资不存在");
+                }
+            }
+
+            //修改发放单状态（移到循环外，只更新一次）
+            outStock.setCreateTime(new Date());
+            outStock.setStatus(0);
+            outStockMapper.updateByPrimaryKeySelective(outStock);
         }else {
             throw new ServiceException("发放的明细不能为空");
         }

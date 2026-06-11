@@ -80,4 +80,13 @@
         ORDER BY expiry_date ASC
     </select>
 
+    <!-- 原子恢复批次数量（回滚已扣减的批次） -->
+    <update id="restoreBatchQuantity">
+        UPDATE biz_product_batch
+        SET quantity = quantity + #{restoreAmount},
+            modified_time = NOW()
+        WHERE id = #{id}
+          AND status = 0
+    </update>
+
 </mapper>

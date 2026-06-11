@@ -1,6 +1,7 @@
 com\coderman\business\mapper\InStockMapper.class
 com\coderman\business\service\ProductService.class
 com\coderman\business\converter\SupplierConverter.class
+com\coderman\business\mapper\ProductBatchTraceMapper.class
 com\coderman\business\mapper\OutStockInfoMapper.class
 com\coderman\business\mapper\InStockInfoMapper.class
 com\coderman\business\service\imp\ConsumerServiceImpl.class

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.coderman.business.mapper.ProductBatchTraceMapper">
+
+    <resultMap id="BaseResultMap" type="com.coderman.common.model.business.ProductBatchTrace">
+        <id column="id" property="id"/>
+        <result column="batch_number" property="batchNumber"/>
+        <result column="p_num" property="pNum"/>
+        <result column="event_type" property="eventType"/>
+        <result column="quantity" property="quantity"/>
+        <result column="ref_num" property="refNum"/>
+        <result column="operator" property="operator"/>
+        <result column="remark" property="remark"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <select id="findByBatchNumber" resultMap="BaseResultMap">
+        SELECT *
+        FROM biz_product_batch_trace
+        WHERE batch_number = #{batchNumber}
+        ORDER BY create_time ASC, id ASC
+    </select>
+
+</mapper>

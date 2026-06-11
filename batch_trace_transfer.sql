@@ -55,7 +55,24 @@ CREATE TABLE IF NOT EXISTS biz_transfer_request_info (
   KEY idx_transfer_num (transfer_num)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- 4. 修改现有表
+-- 4. 批次追溯事件表
+CREATE TABLE IF NOT EXISTS biz_product_batch_trace (
+  id bigint(20) NOT NULL AUTO_INCREMENT,
+  batch_number varchar(64) NOT NULL COMMENT '批次号',
+  p_num varchar(64) NOT NULL COMMENT '物资编号',
+  event_type varchar(16) NOT NULL COMMENT 'IN/QC/LOCK/UNLOCK/OUT/RECEIVE/ROLLBACK',
+  quantity bigint(20) NOT NULL DEFAULT 0 COMMENT '事件数量',
+  ref_num varchar(64) DEFAULT NULL COMMENT '关联单号',
+  operator varchar(64) DEFAULT NULL COMMENT '操作人',
+  remark varchar(512) DEFAULT NULL COMMENT '备注',
+  create_time datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  KEY idx_batch_number (batch_number),
+  KEY idx_event_type (event_type),
+  KEY idx_create_time (create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 5. 修改现有表
 ALTER TABLE biz_consumer
   ADD COLUMN is_isolation_point int(11) NOT NULL DEFAULT 0 COMMENT '0=否,1=是隔离点';
 
