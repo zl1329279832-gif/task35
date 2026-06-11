@@ -262,87 +262,94 @@ public class InStockServiceImpl implements InStockService {
 
     /**
      * 物资入库审核
+     * 修正后的原子性保证：
+     * 1. 库存增加使用悲观锁+乐观锁
+     * 2. 库存增加 + 批次创建在同一事务内原子执行
+     * 3. 入库单状态更新在所有操作成功后才执行
+     * 4. 批次创建时记录追溯事件
      * @param id
      */
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void publish(Long id) {
         InStock inStock = inStockMapper.selectByPrimaryKey(id);
-        Supplier supplier = supplierMapper.selectByPrimaryKey(inStock.getSupplierId());
-        if(inStock==null){
+        if (inStock == null) {
             throw new ServiceException("入库单不存在");
         }
-        if(inStock.getStatus()!=2){
+        if (inStock.getStatus() != 2) {
             throw new ServiceException("入库单状态错误");
         }
-        if(supplier==null){
+        Supplier supplier = supplierMapper.selectByPrimaryKey(inStock.getSupplierId());
+        if (supplier == null) {
             throw new ServiceException("入库来源信息错误");
         }
-        String inNum = inStock.getInNum();//单号
+
+        String inNum = inStock.getInNum(); // 入库单号
         Example o = new Example(InStockInfo.class);
-        o.createCriteria().andEqualTo("inNum",inNum);
+        o.createCriteria().andEqualTo("inNum", inNum);
         List<InStockInfo> infoList = inStockInfoMapper.selectByExample(o);
-        if(!CollectionUtils.isEmpty(infoList)){
-            for (InStockInfo inStockInfo : infoList) {
-                String pNum = inStockInfo.getPNum();//物资编号
-                Integer productNumber = inStockInfo.getProductNumber();//入库物资数
-                Example o1 = new Example(Product.class);
-                o1.createCriteria().andEqualTo("pNum",pNum);
-                List<Product> products = productMapper.selectByExample(o1);
-                if(products.size()>0){
-                    Product product = products.get(0);
-                    //入库如果存在，就增加数量，否则插入
-                    Example o2 = new Example(ProductStock.class);
-                    o2.createCriteria().andEqualTo("pNum",product.getPNum());
-                    List<ProductStock> productStocks = productStockMapper.selectByExample(o2);
-                    if(!CollectionUtils.isEmpty(productStocks)){
-                        //更新数量
-                        ProductStock productStock = productStocks.get(0);
-                        productStock.setStock(productStock.getStock()+productNumber);
-                        productStockMapper.updateByPrimaryKey(productStock);
-                    }else {
-                        //插入
-                        ProductStock productStock = new ProductStock();
-                        productStock.setPNum(product.getPNum());
-                        productStock.setStock((long) productNumber);
-                        productStock.setVersion(0);
-                        productStockMapper.insert(productStock);
-                    }
 
-                    // 创建批次记录
-                    ProductBatch batch = new ProductBatch();
-                    batch.setBatchNumber(
-                            inStockInfo.getBatchNumber() != null && !"".equals(inStockInfo.getBatchNumber())
-                                    ? inStockInfo.getBatchNumber()
-                                    : "BATCH-" + System.currentTimeMillis() + "-" + inStockInfo.getPNum()
-                    );
-                    batch.setPNum(inStockInfo.getPNum());
-                    batch.setInNum(inStock.getInNum());
-                    batch.setSupplierId(inStock.getSupplierId());
-                    batch.setProductionDate(inStockInfo.getProductionDate());
-                    batch.setExpiryDate(inStockInfo.getExpiryDate());
-                    batch.setQualityStatus(
-                            inStockInfo.getQualityStatus() != null ? inStockInfo.getQualityStatus() : 0
-                    );
-                    batch.setReserveLevel(
-                            inStockInfo.getReserveLevel() != null ? inStockInfo.getReserveLevel() : 1
-                    );
-                    batch.setQuantity((long) productNumber);
-                    batch.setLockedQuantity(0L);
-                    batch.setStatus(0);
-                    batch.setCreateTime(new Date());
-                    batch.setModifiedTime(new Date());
-                    productBatchService.createBatch(batch);
-
-                    //修改入库单状态.
-                    inStock.setCreateTime(new Date());
-                    inStock.setStatus(0);
-                    inStockMapper.updateByPrimaryKeySelective(inStock);
-                }else {
-                    throw new ServiceException("物资编号为:["+pNum+"]的物资不存在");
-                }
-            }
-        }else {
+        if (CollectionUtils.isEmpty(infoList)) {
             throw new ServiceException("入库的明细不能为空");
         }
+
+        for (InStockInfo inStockInfo : infoList) {
+            String pNum = inStockInfo.getPNum();
+            Integer productNumber = inStockInfo.getProductNumber();
+
+            Example o1 = new Example(Product.class);
+            o1.createCriteria().andEqualTo("pNum", pNum);
+            List<Product> products = productMapper.selectByExample(o1);
+            if (products.isEmpty()) {
+                throw new ServiceException("物资编号为:[" + pNum + "]的物资不存在");
+            }
+            Product product = products.get(0);
+
+            // 悲观锁查询库存 + 乐观锁更新（或新建）
+            ProductStock productStock = productStockMapper.findByPNumForUpdate(pNum);
+            if (productStock != null) {
+                long newStock = productStock.getStock() + productNumber;
+                int rows = productStockMapper.updateStockWithVersion(pNum, newStock, productStock.getVersion());
+                if (rows == 0) {
+                    throw new ServiceException(ErrorCodeEnum.STOCK_UPDATE_CONFLICT);
+                }
+            } else {
+                ProductStock newStockRecord = new ProductStock();
+                newStockRecord.setPNum(product.getPNum());
+                newStockRecord.setStock((long) productNumber);
+                newStockRecord.setVersion(0);
+                productStockMapper.insert(newStockRecord);
+            }
+
+            // 创建批次记录（带追溯事件）
+            ProductBatch batch = new ProductBatch();
+            batch.setBatchNumber(
+                    inStockInfo.getBatchNumber() != null && !"".equals(inStockInfo.getBatchNumber())
+                            ? inStockInfo.getBatchNumber()
+                            : "BATCH-" + System.currentTimeMillis() + "-" + inStockInfo.getPNum()
+            );
+            batch.setPNum(inStockInfo.getPNum());
+            batch.setInNum(inStock.getInNum());
+            batch.setSupplierId(inStock.getSupplierId());
+            batch.setProductionDate(inStockInfo.getProductionDate());
+            batch.setExpiryDate(inStockInfo.getExpiryDate());
+            batch.setQualityStatus(
+                    inStockInfo.getQualityStatus() != null ? inStockInfo.getQualityStatus() : 0
+            );
+            batch.setReserveLevel(
+                    inStockInfo.getReserveLevel() != null ? inStockInfo.getReserveLevel() : 1
+            );
+            batch.setQuantity((long) productNumber);
+            batch.setLockedQuantity(0L);
+            batch.setStatus(0);
+            batch.setCreateTime(new Date());
+            batch.setModifiedTime(new Date());
+            productBatchService.createBatch(batch, inNum);
+        }
+
+        // 所有明细处理成功后才更新入库单状态
+        inStock.setCreateTime(new Date());
+        inStock.setStatus(0);
+        inStockMapper.updateByPrimaryKeySelective(inStock);
     }
 }

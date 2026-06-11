@@ -17,6 +17,7 @@ C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\model\business\ProductBatch.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\model\system\Department.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\utils\FdfsUtil.java
+C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\model\business\BatchTraceEvent.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\model\system\LoginLog.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\vo\system\ImageAttachmentVO.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\annotation\ControllerEndpoint.java
@@ -27,12 +28,16 @@ C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\model\system\UserRole.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\vo\business\ProductBatchVO.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\vo\system\LoginLogVO.java
+C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\vo\business\BatchTraceEventVO.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\vo\business\ProductStockVO.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\model\system\RoleMenu.java
+C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\enums\buisiness\BatchTraceEventType.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\vo\business\HealthVO.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\vo\system\DepartmentVO.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\model\system\ImageAttachment.java
+C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\enums\buisiness\TransferStatus.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\utils\CreateVerifyCode.java
+C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\enums\buisiness\QualityStatus.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\vo\business\ConsumerVO.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\exception\ErrorCodeEnum.java
 C:\Users\13292\Desktop\claudel1\reposNew\task35\xinguan-common\src\main\java\com\coderman\common\vo\system\UserEditVO.java

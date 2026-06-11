@@ -3,6 +3,7 @@ package com.coderman.common.vo.business;
 import lombok.Data;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 物资批次VO
@@ -26,4 +27,7 @@ public class ProductBatchVO {
     private Long availableQuantity;
     private Integer status;
     private Date createTime;
+
+    /** 追溯事件链（仅追溯查询时填充） */
+    private List<BatchTraceEventVO> traceEvents;
 }

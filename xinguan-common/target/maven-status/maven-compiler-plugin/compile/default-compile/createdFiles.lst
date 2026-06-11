@@ -20,6 +20,7 @@ com\coderman\common\vo\business\MusicVO.class
 com\coderman\common\vo\business\ProductVO.class
 com\coderman\common\utils\BrowserUtil.class
 com\coderman\common\vo\system\DepartmentVO.class
+com\coderman\common\enums\buisiness\TransferStatus.class
 com\coderman\common\enums\system\RoleStatusEnum.class
 com\coderman\common\model\system\ImageAttachment.class
 com\coderman\common\vo\business\InStockItemVO.class
@@ -27,6 +28,7 @@ com\coderman\common\model\business\InStock.class
 com\coderman\common\model\business\Health.class
 com\coderman\common\utils\CreateVerifyCode.class
 com\coderman\common\model\business\Product.class
+com\coderman\common\enums\buisiness\QualityStatus.class
 com\coderman\common\model\business\Consumer.class
 com\coderman\common\model\business\ProductBatch.class
 com\coderman\common\vo\system\RoleVO.class
@@ -35,6 +37,8 @@ com\coderman\common\utils\FdfsUtil.class
 com\coderman\common\vo\business\ProductCategoryTreeNodeVO.class
 com\coderman\common\model\system\UserRole.class
 com\coderman\common\vo\system\RoleTransferItemVO.class
+com\coderman\common\enums\buisiness\BatchTraceEventType.class
+com\coderman\common\model\business\BatchTraceEvent.class
 com\coderman\common\vo\system\PageVO.class
 com\coderman\common\generator\GeneratorCoder.class
 com\coderman\common\exception\BaseCodeInterface.class
@@ -47,6 +51,7 @@ com\coderman\common\utils\ListPageUtils.class
 com\coderman\common\vo\system\UserInfoVO.class
 com\coderman\common\vo\system\DeanVO.class
 com\coderman\common\model\system\Role.class
+com\coderman\common\vo\business\BatchTraceEventVO.class
 com\coderman\common\vo\system\LogVO.class
 com\coderman\common\vo\business\InStockVO.class
 com\coderman\common\vo\system\MenuVO.class

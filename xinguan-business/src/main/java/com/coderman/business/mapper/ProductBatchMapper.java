@@ -46,6 +46,13 @@ public interface ProductBatchMapper extends Mapper<ProductBatch> {
             @Param("deductAmount") Long deductAmount);
 
     /**
+     * 回滚批次扣减（将已扣减的数量加回）
+     */
+    int rollbackBatchDeduction(
+            @Param("id") Long id,
+            @Param("rollbackAmount") Long rollbackAmount);
+
+    /**
      * 按批次号追溯查询
      */
     ProductBatch findTraceByBatchNumber(@Param("batchNumber") String batchNumber);

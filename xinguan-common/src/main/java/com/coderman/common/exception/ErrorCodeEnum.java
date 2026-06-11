@@ -44,7 +44,19 @@ public enum  ErrorCodeEnum implements BaseCodeInterface {
     TRANSFER_NOT_FOUND(30020,"调拨申请不存在"),
     TRANSFER_STATUS_ERROR(30021,"调拨状态错误"),
     TRANSFER_STOCK_CONFLICT(30022,"库存更新冲突,请重试"),
-    TRANSFER_INSUFFICIENT_STOCK(30023,"库存不足,无法调拨");
+    TRANSFER_INSUFFICIENT_STOCK(30023,"库存不足,无法调拨"),
+    TRANSFER_DUPLICATE_SEND(30024,"调拨出库已确认,请勿重复操作"),
+    TRANSFER_DUPLICATE_RECEIVE(30025,"调拨接收已确认,请勿重复操作"),
+    TRANSFER_ROLLBACK_FAILED(30026,"调拨回滚失败"),
+
+    //库存锁定相关
+    STOCK_LOCK_CONFLICT(30030,"库存锁定冲突,批次已被其他操作锁定"),
+    STOCK_UPDATE_CONFLICT(30031,"库存更新冲突,请重试"),
+    STOCK_LOCK_RELEASE_FAILED(30032,"库存锁定释放失败"),
+
+    //幂等相关
+    IDEMPOTENT_DUPLICATE(30040,"重复操作,该操作已执行过");
+
     /** 错误码 */
     private int resultCode;
 

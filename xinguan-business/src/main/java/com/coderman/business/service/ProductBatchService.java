@@ -13,9 +13,14 @@ import java.util.List;
 public interface ProductBatchService {
 
     /**
-     * 创建单个批次记录
+     * 创建单个批次记录（记录追溯事件）
      */
     ProductBatch createBatch(ProductBatch batch);
+
+    /**
+     * 创建单个批次记录并关联业务单号
+     */
+    ProductBatch createBatch(ProductBatch batch, String relatedNum);
 
     /**
      * 批量创建批次记录
@@ -28,12 +33,12 @@ public interface ProductBatchService {
     PageVO<ProductBatchVO> findBatches(Integer pageNum, Integer pageSize, ProductBatchVO vo);
 
     /**
-     * 批次追溯查询
+     * 批次追溯查询（含全链路事件）
      */
     ProductBatchVO getTraceability(String batchNumber);
 
     /**
-     * 更新质检状态
+     * 更新质检状态（记录追溯事件）
      */
     void updateQualityStatus(Long id, Integer qualityStatus);
 
@@ -53,19 +58,56 @@ public interface ProductBatchService {
     BatchAllocationResultVO allocateBatches(String pNum, Long quantity, Long consumerId, String strategy);
 
     /**
-     * 锁定批次库存
+     * 锁定批次库存（记录追溯事件）
+     * @param items 锁定项
+     * @param relatedNum 关联业务单号
+     */
+    void lockBatches(List<BatchLockItem> items, String relatedNum);
+
+    /**
+     * 锁定批次库存（无追溯关联）
      */
     void lockBatches(List<BatchLockItem> items);
 
     /**
-     * 解锁批次库存
+     * 解锁批次库存（记录追溯事件）
+     * @param items 解锁项
+     * @param relatedNum 关联业务单号
+     */
+    void unlockBatches(List<BatchLockItem> items, String relatedNum);
+
+    /**
+     * 解锁批次库存（无追溯关联）
      */
     void unlockBatches(List<BatchLockItem> items);
 
     /**
-     * 确认批次扣减
+     * 确认批次扣减（记录追溯事件）
+     * @param items 扣减项
+     * @param relatedNum 关联业务单号
+     */
+    void confirmBatchDeductions(List<BatchLockItem> items, String relatedNum);
+
+    /**
+     * 确认批次扣减（无追溯关联）
      */
     void confirmBatchDeductions(List<BatchLockItem> items);
+
+    /**
+     * 回滚批次扣减（将已扣减的数量加回，记录ROLLBACK事件）
+     * @param items 回滚项(batchId=批次ID, quantity=回滚数量)
+     * @param relatedNum 关联业务单号
+     */
+    void rollbackBatchDeductions(List<BatchLockItem> items, String relatedNum);
+
+    /**
+     * 记录追溯事件（供外部直接调用）
+     */
+    void recordTraceEvent(String batchNumber, String pNum, String eventType,
+                          String relatedNum, Long quantity,
+                          Long beforeQty, Long beforeLockedQty,
+                          Long afterQty, Long afterLockedQty,
+                          String operator, String remark);
 
     /**
      * 批次锁定项

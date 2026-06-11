@@ -29,7 +29,7 @@ import java.util.UUID;
  * @Version 1.0
  **/
 @Service
-@Transactional
+@Transactional(rollbackFor = Exception.class)
 public class ProductServiceImpl implements ProductService {
 
 

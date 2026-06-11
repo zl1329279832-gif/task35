@@ -3,6 +3,8 @@ package com.coderman.business.service.imp;
 import com.coderman.business.mapper.*;
 import com.coderman.business.service.ProductBatchService;
 import com.coderman.business.service.TransferService;
+import com.coderman.common.enums.buisiness.BatchTraceEventType;
+import com.coderman.common.enums.buisiness.TransferStatus;
 import com.coderman.common.exception.ErrorCodeEnum;
 import com.coderman.common.exception.ServiceException;
 import com.coderman.common.model.business.ProductBatch;
@@ -32,6 +34,17 @@ import java.util.UUID;
 
 /**
  * 调拨服务实现
+ * 修正后的完整状态机:
+ * CREATE → [2:Pending] → approve → [3:Approved] → confirmSend → [4:Sent] → confirmReceive → [0:Complete]
+ *                       ↓ reject                                        ↓ rollback(4)     ↓ rollback(3)
+ *                    [1:Rejected]                                    [6:Rolled Back]   [6:Rolled Back]
+ *
+ * 保证:
+ * - 审批拒绝：仅更新状态，无锁定残留（审批通过前不锁定）
+ * - 出库失败：事务回滚，批次锁定和库存扣减一并回滚
+ * - 接收异常：事务回滚，目标端新批次和库存一并回滚
+ * - 重复确认：通过状态前置检查实现幂等
+ * - 并发调拨：悲观锁+乐观锁双重保护 + 原子批次锁定
  */
 @Transactional
 @Service
@@ -52,6 +65,11 @@ public class TransferServiceImpl implements TransferService {
     @Autowired
     private ProductBatchService productBatchService;
 
+    @Autowired
+    private BatchTraceEventMapper batchTraceEventMapper;
+
+    // ==================== 创建调拨申请 ====================
+
     @Override
     public TransferRequestVO createTransferRequest(TransferRequestVO vo) {
         TransferRequest request = new TransferRequest();
@@ -59,7 +77,7 @@ public class TransferServiceImpl implements TransferService {
 
         String transferNum = UUID.randomUUID().toString().substring(0, 32).replace("-", "");
         request.setTransferNum(transferNum);
-        request.setStatus(2); // 待审批
+        request.setStatus(TransferStatus.PENDING); // 待审批
         if (request.getEmergencyLevel() == null) {
             request.setEmergencyLevel(1);
         }
@@ -82,6 +100,8 @@ public class TransferServiceImpl implements TransferService {
         return result;
     }
 
+    // ==================== 审批通过 ====================
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void approve(Long id) {
@@ -89,11 +109,11 @@ public class TransferServiceImpl implements TransferService {
         if (request == null) {
             throw new ServiceException(ErrorCodeEnum.TRANSFER_NOT_FOUND);
         }
-        if (request.getStatus() != 2) {
+        if (request.getStatus() != TransferStatus.PENDING) {
             throw new ServiceException(ErrorCodeEnum.TRANSFER_STATUS_ERROR);
         }
 
-        // 批次分配
+        // 批次分配（读取快照，不持锁）
         BatchAllocationResultVO allocation = productBatchService.allocateBatches(
                 request.getPNum(), request.getTransferQuantity(), null, "NEAR_EXPIRY");
 
@@ -101,7 +121,7 @@ public class TransferServiceImpl implements TransferService {
             throw new ServiceException(ErrorCodeEnum.TRANSFER_INSUFFICIENT_STOCK);
         }
 
-        // 查找批次ID并锁定
+        // 查找批次ID，准备锁定
         List<ProductBatchService.BatchLockItem> lockItems = new ArrayList<>();
         for (BatchAllocationItemVO allocItem : allocation.getItems()) {
             Example batchExample = new Example(ProductBatch.class);
@@ -121,28 +141,39 @@ public class TransferServiceImpl implements TransferService {
             }
         }
 
-        // 锁定批次库存
-        productBatchService.lockBatches(lockItems);
+        // 原子锁定批次库存（如果任一锁定失败，事务整体回滚，不留残留）
+        try {
+            productBatchService.lockBatches(lockItems, request.getTransferNum());
+        } catch (ServiceException e) {
+            // 锁定失败时事务回滚，已创建的 TransferRequestInfo 也会被回滚
+            throw new ServiceException(ErrorCodeEnum.STOCK_LOCK_CONFLICT);
+        }
 
-        // 更新状态为已审批
-        request.setStatus(3);
+        // 锁定成功后才更新状态
+        request.setStatus(TransferStatus.APPROVED);
         request.setModifiedTime(new Date());
         transferRequestMapper.updateByPrimaryKeySelective(request);
     }
 
+    // ==================== 审批拒绝 ====================
+
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void reject(Long id) {
         TransferRequest request = transferRequestMapper.selectByPrimaryKey(id);
         if (request == null) {
             throw new ServiceException(ErrorCodeEnum.TRANSFER_NOT_FOUND);
         }
-        if (request.getStatus() != 2) {
+        if (request.getStatus() != TransferStatus.PENDING) {
             throw new ServiceException(ErrorCodeEnum.TRANSFER_STATUS_ERROR);
         }
-        request.setStatus(1); // 拒绝
+        // 拒绝时无任何批次锁定，直接更新状态即可
+        request.setStatus(TransferStatus.REJECTED);
         request.setModifiedTime(new Date());
         transferRequestMapper.updateByPrimaryKeySelective(request);
     }
+
+    // ==================== 出库确认 ====================
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -151,7 +182,12 @@ public class TransferServiceImpl implements TransferService {
         if (request == null) {
             throw new ServiceException(ErrorCodeEnum.TRANSFER_NOT_FOUND);
         }
-        if (request.getStatus() != 3) {
+        // 幂等性：如果已经是已发送/已完成/已回滚状态，不重复处理
+        if (request.getStatus() == TransferStatus.SENT
+                || request.getStatus() == TransferStatus.COMPLETED) {
+            return; // 幂等：已确认过，直接返回
+        }
+        if (request.getStatus() != TransferStatus.APPROVED) {
             throw new ServiceException(ErrorCodeEnum.TRANSFER_STATUS_ERROR);
         }
 
@@ -178,7 +214,7 @@ public class TransferServiceImpl implements TransferService {
             throw new ServiceException(ErrorCodeEnum.TRANSFER_STOCK_CONFLICT);
         }
 
-        // 确认批次扣减
+        // 确认批次扣减（解锁+减量同时进行）
         List<ProductBatchService.BatchLockItem> items = new ArrayList<>();
         for (TransferRequestInfo info : infoList) {
             Example batchExample = new Example(ProductBatch.class);
@@ -192,13 +228,15 @@ public class TransferServiceImpl implements TransferService {
             info.setConfirmedQuantity(info.getAllocatedQuantity());
             transferRequestInfoMapper.updateByPrimaryKeySelective(info);
         }
-        productBatchService.confirmBatchDeductions(items);
+        productBatchService.confirmBatchDeductions(items, request.getTransferNum());
 
-        // 更新状态为已发送
-        request.setStatus(4);
+        // 所有操作成功后才更新状态
+        request.setStatus(TransferStatus.SENT);
         request.setModifiedTime(new Date());
         transferRequestMapper.updateByPrimaryKeySelective(request);
     }
+
+    // ==================== 接收确认 ====================
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -207,11 +245,15 @@ public class TransferServiceImpl implements TransferService {
         if (request == null) {
             throw new ServiceException(ErrorCodeEnum.TRANSFER_NOT_FOUND);
         }
-        if (request.getStatus() != 4) {
+        // 幂等性：如果已经是完成状态，不重复处理
+        if (request.getStatus() == TransferStatus.COMPLETED) {
+            return; // 幂等：已接收过，直接返回
+        }
+        if (request.getStatus() != TransferStatus.SENT) {
             throw new ServiceException(ErrorCodeEnum.TRANSFER_STATUS_ERROR);
         }
 
-        // 恢复目标库存
+        // 恢复目标库存（悲观锁+乐观锁）
         ProductStock productStock = productStockMapper.findByPNumForUpdate(request.getPNum());
         if (productStock != null) {
             long newStock = productStock.getStock() + request.getTransferQuantity();
@@ -221,24 +263,26 @@ public class TransferServiceImpl implements TransferService {
                 throw new ServiceException(ErrorCodeEnum.TRANSFER_STOCK_CONFLICT);
             }
         } else {
-            ProductStock newStock = new ProductStock();
-            newStock.setPNum(request.getPNum());
-            newStock.setStock(request.getTransferQuantity());
-            newStock.setVersion(0);
-            productStockMapper.insertSelective(newStock);
+            ProductStock newStockRecord = new ProductStock();
+            newStockRecord.setPNum(request.getPNum());
+            newStockRecord.setStock(request.getTransferQuantity());
+            newStockRecord.setVersion(0);
+            productStockMapper.insertSelective(newStockRecord);
         }
 
-        // 创建目标端新批次记录
+        // 创建目标端新批次记录（带追溯事件）
         List<TransferRequestInfo> infoList = transferRequestInfoMapper.findByTransferNum(request.getTransferNum());
         if (!CollectionUtils.isEmpty(infoList)) {
             for (TransferRequestInfo info : infoList) {
                 // 查找源批次信息
                 ProductBatch sourceBatch = productBatchMapper.findTraceByBatchNumber(info.getBatchNumber());
                 if (sourceBatch != null) {
-                    ProductBatch newBatch = new ProductBatch();
-                    newBatch.setBatchNumber("TRANSFER-"
+                    String newBatchNumber = "TRANSFER-"
                             + request.getTransferNum().substring(0, Math.min(8, request.getTransferNum().length()))
-                            + "-" + info.getBatchNumber());
+                            + "-" + info.getBatchNumber();
+
+                    ProductBatch newBatch = new ProductBatch();
+                    newBatch.setBatchNumber(newBatchNumber);
                     newBatch.setPNum(sourceBatch.getPNum());
                     newBatch.setInNum("TRANSFER-" + request.getTransferNum());
                     newBatch.setSupplierId(sourceBatch.getSupplierId());
@@ -252,15 +296,27 @@ public class TransferServiceImpl implements TransferService {
                     newBatch.setCreateTime(new Date());
                     newBatch.setModifiedTime(new Date());
                     productBatchMapper.insertSelective(newBatch);
+
+                    // 记录目标端新批次的追溯事件
+                    productBatchService.recordTraceEvent(
+                            newBatchNumber, sourceBatch.getPNum(),
+                            BatchTraceEventType.TRANSFER_IN,
+                            request.getTransferNum(),
+                            info.getAllocatedQuantity(),
+                            0L, 0L,
+                            info.getAllocatedQuantity(), 0L,
+                            null, "调拨接收创建新批次,源批次: " + info.getBatchNumber());
                 }
             }
         }
 
         // 更新状态为完成
-        request.setStatus(0);
+        request.setStatus(TransferStatus.COMPLETED);
         request.setModifiedTime(new Date());
         transferRequestMapper.updateByPrimaryKeySelective(request);
     }
+
+    // ==================== 异常回滚 ====================
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -269,14 +325,20 @@ public class TransferServiceImpl implements TransferService {
         if (request == null) {
             throw new ServiceException(ErrorCodeEnum.TRANSFER_NOT_FOUND);
         }
-        if (request.getStatus() != 3 && request.getStatus() != 4) {
+        // 幂等：已回滚的不重复处理
+        if (request.getStatus() == TransferStatus.ROLLED_BACK) {
+            return;
+        }
+        // 只有已审批(3)和已发送(4)状态可以回滚
+        if (request.getStatus() != TransferStatus.APPROVED
+                && request.getStatus() != TransferStatus.SENT) {
             throw new ServiceException(ErrorCodeEnum.TRANSFER_STATUS_ERROR);
         }
 
         List<TransferRequestInfo> infoList = transferRequestInfoMapper.findByTransferNum(request.getTransferNum());
 
-        if (request.getStatus() == 4) {
-            // 已发送状态回滚：恢复库存 + 恢复批次数量
+        if (request.getStatus() == TransferStatus.SENT) {
+            // 已发送状态回滚：恢复总库存 + 恢复批次数量（原子SQL）
             ProductStock productStock = productStockMapper.findByPNumForUpdate(request.getPNum());
             if (productStock != null) {
                 long newStock = productStock.getStock() + request.getTransferQuantity();
@@ -287,21 +349,22 @@ public class TransferServiceImpl implements TransferService {
                 }
             }
 
-            // 恢复批次数量（将已扣减的数量加回）
+            // 使用原子SQL恢复批次数量（替代手动updateByPrimaryKeySelective）
             if (!CollectionUtils.isEmpty(infoList)) {
+                List<ProductBatchService.BatchLockItem> rollbackItems = new ArrayList<>();
                 for (TransferRequestInfo info : infoList) {
                     Example batchExample = new Example(ProductBatch.class);
                     batchExample.createCriteria().andEqualTo("batchNumber", info.getBatchNumber());
                     List<ProductBatch> batches = productBatchMapper.selectByExample(batchExample);
                     if (!CollectionUtils.isEmpty(batches)) {
-                        ProductBatch batch = batches.get(0);
-                        batch.setQuantity(batch.getQuantity() + info.getAllocatedQuantity());
-                        batch.setModifiedTime(new Date());
-                        productBatchMapper.updateByPrimaryKeySelective(batch);
+                        rollbackItems.add(new ProductBatchService.BatchLockItem(
+                                batches.get(0).getId(), info.getAllocatedQuantity()));
                     }
                 }
+                productBatchService.rollbackBatchDeductions(rollbackItems, request.getTransferNum());
             }
-        } else if (request.getStatus() == 3) {
+
+        } else if (request.getStatus() == TransferStatus.APPROVED) {
             // 已审批状态回滚：解锁批次
             if (!CollectionUtils.isEmpty(infoList)) {
                 List<ProductBatchService.BatchLockItem> unlockItems = new ArrayList<>();
@@ -314,18 +377,20 @@ public class TransferServiceImpl implements TransferService {
                                 batches.get(0).getId(), info.getAllocatedQuantity()));
                     }
                 }
-                productBatchService.unlockBatches(unlockItems);
+                productBatchService.unlockBatches(unlockItems, request.getTransferNum());
             }
         }
 
         // 更新状态为回滚
-        request.setStatus(6);
+        request.setStatus(TransferStatus.ROLLED_BACK);
         request.setReason(request.getReason() != null
                 ? request.getReason() + " | 回滚原因: " + reason
                 : "回滚原因: " + reason);
         request.setModifiedTime(new Date());
         transferRequestMapper.updateByPrimaryKeySelective(request);
     }
+
+    // ==================== 查询 ====================
 
     @Override
     public PageVO<TransferRequestVO> findTransferRequests(Integer pageNum, Integer pageSize, TransferRequestVO vo) {
