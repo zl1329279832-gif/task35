@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.coderman.business.mapper.BatchTraceEventMapper">
+
+    <resultMap id="BaseResultMap" type="com.coderman.common.model.business.BatchTraceEvent">
+        <id column="id" property="id"/>
+        <result column="batch_number" property="batchNumber"/>
+        <result column="p_num" property="pNum"/>
+        <result column="event_type" property="eventType"/>
+        <result column="related_num" property="relatedNum"/>
+        <result column="quantity" property="quantity"/>
+        <result column="before_quantity" property="beforeQuantity"/>
+        <result column="before_locked_quantity" property="beforeLockedQuantity"/>
+        <result column="after_quantity" property="afterQuantity"/>
+        <result column="after_locked_quantity" property="afterLockedQuantity"/>
+        <result column="operator" property="operator"/>
+        <result column="remark" property="remark"/>
+        <result column="event_time" property="eventTime"/>
+    </resultMap>
+
+    <select id="findByBatchNumber" resultMap="BaseResultMap">
+        SELECT * FROM biz_batch_trace_event
+        WHERE batch_number = #{batchNumber}
+        ORDER BY event_time ASC, id ASC
+    </select>
+
+    <select id="findByRelatedNum" resultMap="BaseResultMap">
+        SELECT * FROM biz_batch_trace_event
+        WHERE related_num = #{relatedNum}
+        ORDER BY event_time ASC, id ASC
+    </select>
+
+    <select id="findByEventType" resultMap="BaseResultMap">
+        SELECT * FROM biz_batch_trace_event
+        WHERE event_type = #{eventType}
+        ORDER BY event_time DESC
+    </select>
+
+</mapper>

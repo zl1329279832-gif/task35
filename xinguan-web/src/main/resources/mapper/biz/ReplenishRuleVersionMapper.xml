@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.coderman.business.mapper.ReplenishRuleVersionMapper">
+
+    <resultMap id="BaseResultMap" type="com.coderman.common.model.business.ReplenishRuleVersion">
+        <id column="id" property="id"/>
+        <result column="version_num" property="versionNum"/>
+        <result column="lookback_days" property="lookbackDays"/>
+        <result column="near_expiry_days" property="nearExpiryDays"/>
+        <result column="safe_days" property="safeDays"/>
+        <result column="low_days" property="lowDays"/>
+        <result column="medium_days" property="mediumDays"/>
+        <result column="high_days" property="highDays"/>
+        <result column="safety_stock_days" property="safetyStockDays"/>
+        <result column="supplier_lead_time_default" property="supplierLeadTimeDefault"/>
+        <result column="suggestion_dedup_hours" property="suggestionDedupHours"/>
+        <result column="is_active" property="isActive"/>
+        <result column="created_by" property="createdBy"/>
+        <result column="create_time" property="createTime"/>
+        <result column="modified_time" property="modifiedTime"/>
+    </resultMap>
+
+    <!-- 查询当前激活的规则版本 -->
+    <select id="findActiveRule" resultMap="BaseResultMap">
+        SELECT * FROM biz_replenish_rule_version WHERE is_active = 1 LIMIT 1
+    </select>
+
+</mapper>

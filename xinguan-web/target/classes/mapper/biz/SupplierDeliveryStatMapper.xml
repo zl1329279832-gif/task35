@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.coderman.business.mapper.SupplierDeliveryStatMapper">
+
+    <resultMap id="BaseResultMap" type="com.coderman.common.model.business.SupplierDeliveryStat">
+        <id column="id" property="id"/>
+        <result column="supplier_id" property="supplierId"/>
+        <result column="p_num" property="pNum"/>
+        <result column="total_deliveries" property="totalDeliveries"/>
+        <result column="on_time_deliveries" property="onTimeDeliveries"/>
+        <result column="avg_lead_days" property="avgLeadDays"/>
+        <result column="max_lead_days" property="maxLeadDays"/>
+        <result column="min_lead_days" property="minLeadDays"/>
+        <result column="on_time_rate" property="onTimeRate"/>
+        <result column="last_delivery_time" property="lastDeliveryTime"/>
+        <result column="promised_lead_days" property="promisedLeadDays"/>
+        <result column="create_time" property="createTime"/>
+        <result column="modified_time" property="modifiedTime"/>
+    </resultMap>
+
+    <!-- 按供应商和物资编号查询统计 -->
+    <select id="findBySupplierAndPNum" resultMap="BaseResultMap">
+        SELECT * FROM biz_supplier_delivery_stat
+        WHERE supplier_id = #{supplierId}
+          AND p_num = #{pNum}
+    </select>
+
+    <!-- 按供应商查询整体统计(pNum IS NULL) -->
+    <select id="findBySupplierOverall" resultMap="BaseResultMap">
+        SELECT * FROM biz_supplier_delivery_stat
+        WHERE supplier_id = #{supplierId}
+          AND p_num IS NULL
+    </select>
+
+</mapper>

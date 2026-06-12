@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.coderman.business.mapper.InventoryRiskSnapshotMapper">
+
+    <resultMap id="BaseResultMap" type="com.coderman.common.model.business.InventoryRiskSnapshot">
+        <id column="id" property="id"/>
+        <result column="p_num" property="pNum"/>
+        <result column="snapshot_time" property="snapshotTime"/>
+        <result column="total_batch_quantity" property="totalBatchQuantity"/>
+        <result column="locked_quantity" property="lockedQuantity"/>
+        <result column="in_transit_quantity" property="inTransitQuantity"/>
+        <result column="available_stock" property="availableStock"/>
+        <result column="daily_consumption_rate" property="dailyConsumptionRate"/>
+        <result column="lookback_days" property="lookbackDays"/>
+        <result column="available_days" property="availableDays"/>
+        <result column="near_expiry_batch_count" property="nearExpiryBatchCount"/>
+        <result column="near_expiry_quantity" property="nearExpiryQuantity"/>
+        <result column="risk_level" property="riskLevel"/>
+        <result column="has_expiry_risk" property="hasExpiryRisk"/>
+        <result column="rule_version_id" property="ruleVersionId"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <!-- 查询指定物资的最新快照 -->
+    <select id="findLatestByPNum" resultMap="BaseResultMap">
+        SELECT * FROM biz_inventory_risk_snapshot
+        WHERE p_num = #{pNum}
+        ORDER BY snapshot_time DESC
+        LIMIT 1
+    </select>
+
+    <!-- 查询所有物资的最新快照(每个pNum一条) -->
+    <select id="findLatestAll" resultMap="BaseResultMap">
+        SELECT s.* FROM biz_inventory_risk_snapshot s
+        INNER JOIN (
+            SELECT p_num, MAX(snapshot_time) AS max_time
+            FROM biz_inventory_risk_snapshot
+            GROUP BY p_num
+        ) t ON s.p_num = t.p_num AND s.snapshot_time = t.max_time
+        ORDER BY
+            CASE s.risk_level
+                WHEN 'CRITICAL' THEN 1
+                WHEN 'HIGH' THEN 2
+                WHEN 'MEDIUM' THEN 3
+                WHEN 'LOW' THEN 4
+                WHEN 'SAFE' THEN 5
+            END
+    </select>
+
+    <!-- 按风险等级查询最新快照 -->
+    <select id="findByRiskLevel" resultMap="BaseResultMap">
+        SELECT s.* FROM biz_inventory_risk_snapshot s
+        INNER JOIN (
+            SELECT p_num, MAX(snapshot_time) AS max_time
+            FROM biz_inventory_risk_snapshot
+            GROUP BY p_num
+        ) t ON s.p_num = t.p_num AND s.snapshot_time = t.max_time
+        WHERE s.risk_level = #{riskLevel}
+    </select>
+
+    <!-- 按风险等级统计数量 -->
+    <select id="countByRiskLevel" resultType="java.util.Map">
+        SELECT s.risk_level AS riskLevel, COUNT(*) AS cnt
+        FROM biz_inventory_risk_snapshot s
+        INNER JOIN (
+            SELECT p_num, MAX(snapshot_time) AS max_time
+            FROM biz_inventory_risk_snapshot
+            GROUP BY p_num
+        ) t ON s.p_num = t.p_num AND s.snapshot_time = t.max_time
+        GROUP BY s.risk_level
+    </select>
+
+</mapper>

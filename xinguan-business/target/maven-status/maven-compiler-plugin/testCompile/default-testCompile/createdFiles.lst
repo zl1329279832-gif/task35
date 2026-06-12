@@ -1,2 +1,6 @@
-com\coderman\business\service\ProductBatchServiceTest.class
+com\coderman\business\service\InventoryRiskServiceTest.class
+com\coderman\business\service\ReplenishRuleServiceTest.class
 com\coderman\business\service\TransferServiceTest.class
+com\coderman\business\service\ProductBatchServiceTest.class
+com\coderman\business\service\ReplenishSuggestionServiceTest.class
+com\coderman\business\service\SupplierDeliveryStatServiceTest.class

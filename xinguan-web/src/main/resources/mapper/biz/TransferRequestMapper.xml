@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.coderman.business.mapper.TransferRequestMapper">
+
+    <!-- 按物资编号汇总在途调拨量(APPROVED=3, SENT=4) -->
+    <select id="sumInTransitByPNum" resultType="java.util.Map">
+        SELECT p_num AS pNum,
+               COALESCE(SUM(transfer_quantity), 0) AS inTransitQuantity
+        FROM biz_transfer_request
+        WHERE status IN (3, 4)
+        GROUP BY p_num
+    </select>
+
+</mapper>

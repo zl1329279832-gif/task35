@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.coderman.business.mapper.SuggestionAuditMapper">
+
+    <resultMap id="BaseResultMap" type="com.coderman.common.model.business.SuggestionAudit">
+        <id column="id" property="id"/>
+        <result column="suggestion_id" property="suggestionId"/>
+        <result column="suggestion_num" property="suggestionNum"/>
+        <result column="action" property="action"/>
+        <result column="before_status" property="beforeStatus"/>
+        <result column="after_status" property="afterStatus"/>
+        <result column="operator" property="operator"/>
+        <result column="remark" property="remark"/>
+        <result column="related_num" property="relatedNum"/>
+        <result column="event_time" property="eventTime"/>
+    </resultMap>
+
+    <!-- 按建议ID查询审计记录 -->
+    <select id="findBySuggestionId" resultMap="BaseResultMap">
+        SELECT * FROM biz_suggestion_audit
+        WHERE suggestion_id = #{suggestionId}
+        ORDER BY event_time ASC
+    </select>
+
+    <!-- 按建议单号查询审计记录 -->
+    <select id="findBySuggestionNum" resultMap="BaseResultMap">
+        SELECT * FROM biz_suggestion_audit
+        WHERE suggestion_num = #{suggestionNum}
+        ORDER BY event_time ASC
+    </select>
+
+</mapper>

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.coderman.business.mapper.OutStockInfoMapper">
+
+    <!-- 按物资编号汇总指定时间之后的出库数量 -->
+    <select id="sumOutboundByPNumSince" resultType="java.util.Map">
+        SELECT osi.p_num AS pNum,
+               COALESCE(SUM(osi.product_number), 0) AS totalOutbound
+        FROM biz_out_stock_info osi
+        JOIN biz_out_stock os ON osi.out_num = os.out_num
+        WHERE os.status = 0
+          AND os.create_time &gt;= #{sinceDate}
+        GROUP BY osi.p_num
+    </select>
+
+</mapper>

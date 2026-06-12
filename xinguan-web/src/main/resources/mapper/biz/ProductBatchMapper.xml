@@ -98,4 +98,27 @@
         ORDER BY expiry_date ASC
     </select>
 
+    <!-- 按物资编号汇总批次可用量 -->
+    <select id="sumAvailableByPNum" resultType="java.util.Map">
+        SELECT p_num AS pNum,
+               COALESCE(SUM(quantity), 0) AS totalQuantity,
+               COALESCE(SUM(locked_quantity), 0) AS totalLocked
+        FROM biz_product_batch
+        WHERE status = 0
+          AND quality_status IN (0, 1)
+        GROUP BY p_num
+    </select>
+
+    <!-- 按物资编号查询近效期批次 -->
+    <select id="findNearExpiryBatchesByPNum" resultMap="BaseResultMap">
+        SELECT *
+        FROM biz_product_batch
+        WHERE p_num = #{pNum}
+          AND status = 0
+          AND quality_status IN (0, 1)
+          AND expiry_date IS NOT NULL
+          AND expiry_date &lt;= DATE_ADD(NOW(), INTERVAL #{days} DAY)
+        ORDER BY expiry_date ASC
+    </select>
+
 </mapper>

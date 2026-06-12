@@ -55,7 +55,24 @@ public enum  ErrorCodeEnum implements BaseCodeInterface {
     STOCK_LOCK_RELEASE_FAILED(30032,"库存锁定释放失败"),
 
     //幂等相关
-    IDEMPOTENT_DUPLICATE(30040,"重复操作,该操作已执行过");
+    IDEMPOTENT_DUPLICATE(30040,"重复操作,该操作已执行过"),
+
+    //库存风险相关
+    RISK_RULE_NOT_FOUND(30050,"风险规则版本不存在"),
+    RISK_RULE_ALREADY_ACTIVE(30051,"已存在激活的规则版本"),
+    RISK_SNAPSHOT_NOT_FOUND(30052,"风险快照不存在"),
+
+    //补货建议相关
+    SUGGESTION_NOT_FOUND(30060,"补货建议不存在"),
+    SUGGESTION_STATUS_ERROR(30061,"建议状态错误,无法执行此操作"),
+    SUGGESTION_ALREADY_ADOPTED(30062,"建议已被采纳,请勿重复操作"),
+    SUGGESTION_ALREADY_REJECTED(30063,"建议已被拒绝"),
+    SUGGESTION_DUPLICATE(30064,"相同物资存在未处理的建议,请先处理"),
+    SUGGESTION_ADOPT_FAILED(30065,"建议采纳执行失败"),
+
+    //供应商交付统计相关
+    SUPPLIER_STAT_NOT_FOUND(30070,"供应商交付统计不存在"),
+    SUPPLIER_STAT_UPDATE_FAILED(30071,"供应商交付统计更新失败");
 
     /** 错误码 */
     private int resultCode;

@@ -5,11 +5,24 @@ import org.apache.ibatis.annotations.Param;
 import tk.mybatis.mapper.common.Mapper;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 物资批次Mapper
  */
 public interface ProductBatchMapper extends Mapper<ProductBatch> {
+
+    /**
+     * 按物资编号汇总批次可用量
+     */
+    List<Map<String, Object>> sumAvailableByPNum();
+
+    /**
+     * 按物资编号查询近效期批次
+     */
+    List<ProductBatch> findNearExpiryBatchesByPNum(
+            @Param("pNum") String pNum,
+            @Param("days") int days);
 
     /**
      * 查询可用批次（按指定排序）

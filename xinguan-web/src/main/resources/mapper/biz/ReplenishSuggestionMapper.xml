@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.coderman.business.mapper.ReplenishSuggestionMapper">
+
+    <resultMap id="BaseResultMap" type="com.coderman.common.model.business.ReplenishSuggestion">
+        <id column="id" property="id"/>
+        <result column="suggestion_num" property="suggestionNum"/>
+        <result column="p_num" property="pNum"/>
+        <result column="suggestion_type" property="suggestionType"/>
+        <result column="risk_snapshot_id" property="riskSnapshotId"/>
+        <result column="risk_level" property="riskLevel"/>
+        <result column="suggested_quantity" property="suggestedQuantity"/>
+        <result column="from_department" property="fromDepartment"/>
+        <result column="to_department" property="toDepartment"/>
+        <result column="supplier_id" property="supplierId"/>
+        <result column="estimated_lead_days" property="estimatedLeadDays"/>
+        <result column="priority_batches" property="priorityBatches"/>
+        <result column="reason" property="reason"/>
+        <result column="status" property="status"/>
+        <result column="adopted_by" property="adoptedBy"/>
+        <result column="adopted_time" property="adoptedTime"/>
+        <result column="related_transfer_num" property="relatedTransferNum"/>
+        <result column="related_in_num" property="relatedInNum"/>
+        <result column="create_time" property="createTime"/>
+        <result column="modified_time" property="modifiedTime"/>
+    </resultMap>
+
+    <!-- 查询去重窗口内未处理的建议 -->
+    <select id="findActiveByPNumAndType" resultMap="BaseResultMap">
+        SELECT * FROM biz_replenish_suggestion
+        WHERE p_num = #{pNum}
+          AND suggestion_type = #{suggestionType}
+          AND status = 0
+          AND create_time &gt;= DATE_SUB(NOW(), INTERVAL #{dedupHours} HOUR)
+    </select>
+
+    <!-- 按关联调拨单号查询建议 -->
+    <select id="findByRelatedTransferNum" resultMap="BaseResultMap">
+        SELECT * FROM biz_replenish_suggestion
+        WHERE related_transfer_num = #{transferNum}
+        LIMIT 1
+    </select>
+
+    <!-- 统计待处理建议数量 -->
+    <select id="countPending" resultType="int">
+        SELECT COUNT(*) FROM biz_replenish_suggestion WHERE status = 0
+    </select>
+
+</mapper>
