@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.coderman.business.mapper.StockRiskSnapshotMapper">
+
+    <resultMap id="BaseResultMap" type="com.coderman.common.model.business.StockRiskSnapshot">
+        <id column="id" property="id"/>
+        <result column="snapshot_num" property="snapshotNum"/>
+        <result column="p_num" property="pNum"/>
+        <result column="total_stock" property="totalStock"/>
+        <result column="available_stock" property="availableStock"/>
+        <result column="locked_stock" property="lockedStock"/>
+        <result column="in_transit_stock" property="inTransitStock"/>
+        <result column="near_expiry_stock" property="nearExpiryStock"/>
+        <result column="avg_daily_outbound" property="avgDailyOutbound"/>
+        <result column="available_days" property="availableDays"/>
+        <result column="gap_quantity" property="gapQuantity"/>
+        <result column="risk_level" property="riskLevel"/>
+        <result column="rule_version" property="ruleVersion"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <!-- 查找某物资的最新快照 -->
+    <select id="findLatestByPNum" resultMap="BaseResultMap">
+        SELECT *
+        FROM biz_stock_risk_snapshot
+        WHERE p_num = #{pNum}
+        ORDER BY create_time DESC
+        LIMIT 1
+    </select>
+
+    <!-- 按风险等级查询最新快照（每个物资取最新一条） -->
+    <select id="findLatestSnapshotsByRiskLevel" resultMap="BaseResultMap">
+        SELECT s.*
+        FROM biz_stock_risk_snapshot s
+        INNER JOIN (
+            SELECT p_num, MAX(create_time) AS max_time
+            FROM biz_stock_risk_snapshot
+            GROUP BY p_num
+        ) latest ON s.p_num = latest.p_num AND s.create_time = latest.max_time
+        WHERE s.risk_level = #{riskLevel}
+        ORDER BY s.create_time DESC
+    </select>
+
+    <!-- 查询所有物资的最新快照 -->
+    <select id="findAllLatestSnapshots" resultMap="BaseResultMap">
+        SELECT s.*
+        FROM biz_stock_risk_snapshot s
+        INNER JOIN (
+            SELECT p_num, MAX(create_time) AS max_time
+            FROM biz_stock_risk_snapshot
+            GROUP BY p_num
+        ) latest ON s.p_num = latest.p_num AND s.create_time = latest.max_time
+        ORDER BY s.risk_level DESC, s.create_time DESC
+    </select>
+
+    <!-- 统计各风险等级的物资数量 -->
+    <select id="countByRiskLevel" resultType="int">
+        SELECT COUNT(DISTINCT s.p_num)
+        FROM biz_stock_risk_snapshot s
+        INNER JOIN (
+            SELECT p_num, MAX(create_time) AS max_time
+            FROM biz_stock_risk_snapshot
+            GROUP BY p_num
+        ) latest ON s.p_num = latest.p_num AND s.create_time = latest.max_time
+        WHERE s.risk_level = #{riskLevel}
+    </select>
+
+</mapper>

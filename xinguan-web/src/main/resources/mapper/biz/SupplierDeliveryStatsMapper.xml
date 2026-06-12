@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.coderman.business.mapper.SupplierDeliveryStatsMapper">
+
+    <resultMap id="BaseResultMap" type="com.coderman.common.model.business.SupplierDeliveryStats">
+        <id column="id" property="id"/>
+        <result column="supplier_id" property="supplierId"/>
+        <result column="p_num" property="pNum"/>
+        <result column="total_orders" property="totalOrders"/>
+        <result column="on_time_orders" property="onTimeOrders"/>
+        <result column="late_orders" property="lateOrders"/>
+        <result column="avg_delivery_days" property="avgDeliveryDays"/>
+        <result column="avg_delay_days" property="avgDelayDays"/>
+        <result column="last_delivery_date" property="lastDeliveryDate"/>
+        <result column="create_time" property="createTime"/>
+        <result column="modified_time" property="modifiedTime"/>
+    </resultMap>
+
+    <!-- 按供应商和物资查找统计 -->
+    <select id="findBySupplierAndProduct" resultMap="BaseResultMap">
+        SELECT *
+        FROM biz_supplier_delivery_stats
+        WHERE supplier_id = #{supplierId}
+          AND p_num = #{pNum}
+    </select>
+
+    <!-- UPSERT统计 -->
+    <insert id="upsertStats" parameterType="com.coderman.common.model.business.SupplierDeliveryStats">
+        INSERT INTO biz_supplier_delivery_stats
+            (supplier_id, p_num, total_orders, on_time_orders, late_orders,
+             avg_delivery_days, avg_delay_days, last_delivery_date, create_time, modified_time)
+        VALUES
+            (#{supplierId}, #{pNum}, #{totalOrders}, #{onTimeOrders}, #{lateOrders},
+             #{avgDeliveryDays}, #{avgDelayDays}, #{lastDeliveryDate}, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE
+            total_orders = #{totalOrders},
+            on_time_orders = #{onTimeOrders},
+            late_orders = #{lateOrders},
+            avg_delivery_days = #{avgDeliveryDays},
+            avg_delay_days = #{avgDelayDays},
+            last_delivery_date = #{lastDeliveryDate},
+            modified_time = NOW()
+    </insert>
+
+    <!-- 查准时率低于阈值的供应商 -->
+    <select id="findDelayedSuppliers" resultMap="BaseResultMap">
+        SELECT *
+        FROM biz_supplier_delivery_stats
+        WHERE total_orders &gt; 0
+          AND (on_time_orders / total_orders) &lt; #{threshold}
+        ORDER BY (on_time_orders / total_orders) ASC
+    </select>
+
+</mapper>

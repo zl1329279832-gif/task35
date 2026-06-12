@@ -1,6 +1,7 @@
 package com.coderman.business.service.imp;
 
 import com.coderman.business.mapper.*;
+import com.coderman.business.event.StockChangedEvent;
 import com.coderman.business.service.ProductBatchService;
 import com.coderman.business.service.TransferService;
 import com.coderman.common.enums.buisiness.BatchTraceEventType;
@@ -22,6 +23,7 @@ import com.github.pagehelper.PageInfo;
 import org.apache.shiro.SecurityUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -67,6 +69,9 @@ public class TransferServiceImpl implements TransferService {
 
     @Autowired
     private BatchTraceEventMapper batchTraceEventMapper;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     // ==================== 创建调拨申请 ====================
 
@@ -234,6 +239,9 @@ public class TransferServiceImpl implements TransferService {
         request.setStatus(TransferStatus.SENT);
         request.setModifiedTime(new Date());
         transferRequestMapper.updateByPrimaryKeySelective(request);
+
+        // 发布库存变动事件
+        eventPublisher.publishEvent(new StockChangedEvent(request.getPNum()));
     }
 
     // ==================== 接收确认 ====================
@@ -314,6 +322,9 @@ public class TransferServiceImpl implements TransferService {
         request.setStatus(TransferStatus.COMPLETED);
         request.setModifiedTime(new Date());
         transferRequestMapper.updateByPrimaryKeySelective(request);
+
+        // 发布库存变动事件
+        eventPublisher.publishEvent(new StockChangedEvent(request.getPNum()));
     }
 
     // ==================== 异常回滚 ====================
@@ -388,6 +399,9 @@ public class TransferServiceImpl implements TransferService {
                 : "回滚原因: " + reason);
         request.setModifiedTime(new Date());
         transferRequestMapper.updateByPrimaryKeySelective(request);
+
+        // 发布库存变动事件
+        eventPublisher.publishEvent(new StockChangedEvent(request.getPNum()));
     }
 
     // ==================== 查询 ====================

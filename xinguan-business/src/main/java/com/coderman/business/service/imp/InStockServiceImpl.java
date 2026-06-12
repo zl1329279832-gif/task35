@@ -1,6 +1,8 @@
 package com.coderman.business.service.imp;
 
 import com.coderman.business.converter.InStockConverter;
+import com.coderman.business.event.InStockApprovedEvent;
+import com.coderman.business.event.StockChangedEvent;
 import com.coderman.business.mapper.*;
 import com.coderman.business.service.InStockService;
 import com.coderman.business.service.ProductBatchService;
@@ -18,6 +20,7 @@ import com.github.pagehelper.PageInfo;
 import org.apache.shiro.SecurityUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -57,6 +60,9 @@ public class InStockServiceImpl implements InStockService {
 
     @Autowired
     private ProductBatchService productBatchService;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     /**
      * 入库单
@@ -351,5 +357,12 @@ public class InStockServiceImpl implements InStockService {
         inStock.setCreateTime(new Date());
         inStock.setStatus(0);
         inStockMapper.updateByPrimaryKeySelective(inStock);
+
+        // 发布库存变动和入库审批事件（触发风险重算和供应商交付统计）
+        for (InStockInfo info : infoList) {
+            eventPublisher.publishEvent(new StockChangedEvent(info.getPNum()));
+        }
+        eventPublisher.publishEvent(new InStockApprovedEvent(
+                inStock.getSupplierId(), infoList.get(0).getPNum(), inStock.getProductNumber()));
     }
 }

@@ -1,6 +1,7 @@
 package com.coderman.business.service.imp;
 
 import com.coderman.business.converter.OutStockConverter;
+import com.coderman.business.event.StockChangedEvent;
 import com.coderman.business.mapper.*;
 import com.coderman.business.service.OutStockService;
 import com.coderman.business.service.ProductBatchService;
@@ -20,6 +21,7 @@ import com.github.pagehelper.PageInfo;
 import org.apache.shiro.SecurityUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
@@ -62,6 +64,9 @@ public class OutStockServiceImpl implements OutStockService {
 
     @Autowired
     private ProductBatchService productBatchService;
+
+    @Autowired
+    private ApplicationEventPublisher eventPublisher;
 
     /**
      * 入库单列表
@@ -354,5 +359,10 @@ public class OutStockServiceImpl implements OutStockService {
         outStock.setCreateTime(new Date());
         outStock.setStatus(0);
         outStockMapper.updateByPrimaryKeySelective(outStock);
+
+        // 发布库存变动事件（触发风险重算）
+        for (OutStockInfo outStockInfo : infoList) {
+            eventPublisher.publishEvent(new StockChangedEvent(outStockInfo.getPNum()));
+        }
     }
 }
